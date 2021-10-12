@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, View, Text, Button, FlatList } from 'react-native';
-import firebase from 'firebase';
-import firestore from 'firebase';
+import firebase from 'firebase/app';
+import "firebase/auth";
+import "firebase/firestore";
 
 // const firebase = require('firebase');
 // require('firebase/firestore');
@@ -11,7 +12,6 @@ import firestore from 'firebase';
 
 // Careful, this is just an example, you need to implement the same ideas here in Chat.js then import Chat component to App.js and use it there.
 class App extends React.Component {
-
   constructor() {
     super();
     this.state = {
@@ -22,10 +22,6 @@ class App extends React.Component {
 
     if (!firebase.apps.length) {
       firebase.initializeApp({
-        firebaseConfig
-      });
-
-      const firebaseConfig = {
         apiKey: "AIzaSyA9BlybtbAeWWYmZLV6zagLf1ydaNyhiX4",
         authDomain: "test-e4daa.firebaseapp.com",
         projectId: "test-e4daa",
@@ -33,14 +29,34 @@ class App extends React.Component {
         messagingSenderId: "772187148804",
         appId: "1:772187148804:web:6a61d892ad4ea8c8fa1b51",
         measurementId: "G-2QTL1F2KBS"
-      };
+      })
     }
+
   }
 
   componentDidMount() {
-    this.referenceShoppingLists = firebase.firestore().collection('shoppinglists');
-    this.unsubscribe = this.referenceShoppingLists.onSnapshot(this.onCollectionUpdate)
+    this.referenceShoppingLists = firebase.firestore().collection("shoppinglists")
+
+    this.authUnsubscribe = firebase.auth().onAuthStateChanged(async (user) => {
+      if (!user) {
+        await firebase.auth().signInAnonymously();
+      }
+
+      //update user state with currently active user data
+      this.setState({
+        uid: user.uid,
+        loggedInText: 'Hello there',
+      });
+    });
+
+    // create a reference to the active user's documents (shopping lists)
+    this.referenceShoppinglistUser = firebase.firestore().collection('shoppinglists').where("uid", "==", this.state.uid);
+
+    // listen for collection changes for current user
+    this.unsubscribeListUser = this.referenceShoppinglistUser.onSnapshot(this.onCollectionUpdate);
   }
+
+
 
   componentWillUnmount() {
     this.unsubscribe();
@@ -62,10 +78,20 @@ class App extends React.Component {
     });
   };
 
+  addList() {
+    // add a new list to the collection
+    this.referenceShoppingLists.add({
+      name: 'TestList',
+      items: ['eggs', 'pasta', 'veggies'],
+      uid: this.state.uid,
+    });
+  }
+
   render() {
 
     return (
       <View style={styles.container}>
+        <Text>{this.state.loggedInText}</Text>
         <FlatList
           data={this.state.lists}
           renderItem={({ item }) =>
